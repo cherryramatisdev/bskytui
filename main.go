@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/cherryramatisdev/bskytui/sdk"
 	"github.com/cherryramatisdev/bskytui/tui"
-
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/cherryramatisdev/bskytui/util"
 )
 
 func main() {
@@ -22,6 +22,11 @@ func main() {
 		panic(err)
 	}
 
+	if util.IsDebug() {
+		_, _ = sdk.GetTimeline(ctx)
+		return
+	}
+
 	timeline, err := sdk.GetTimeline(ctx)
 
 	// TODO: remove this panic for a prettier handle (when it's TUI)
@@ -32,6 +37,7 @@ func main() {
 	p := tea.NewProgram(tui.InitialModel(timeline))
 
 	// TODO: remove this panic for a prettier handle (when it's TUI)
+
 	if _, err := p.Run(); err != nil {
 		panic(err)
 	}
