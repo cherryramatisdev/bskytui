@@ -85,18 +85,23 @@ func Authenticate(authUser AuthUser) (context.Context, error) {
 	return ctx, nil
 }
 
+type Feed struct {
+	Post struct {
+		Author struct {
+			ID          string `json:"did"`
+			DisplayName string `json:"displayName"`
+			Handle      string `json:"handle"`
+		} `json:"author"`
+		Record struct {
+			Reply interface{} `json:"reply"`
+			Langs []string    `json:"langs"`
+			Text  string      `json:"text"`
+		} `json:"record"`
+	} `json:"post"`
+}
+
 type Timeline struct {
-	Feed []struct {
-		Post struct {
-			Author struct {
-				DisplayName string `json:"displayName"`
-			} `json:"author"`
-			Record struct {
-				Langs []string `json:"langs"`
-				Text  string   `json:"text"`
-			} `json:"record"`
-		} `json:"post"`
-	} `json:"feed"`
+	Feed []Feed `json:"feed"`
 }
 
 func GetTimeline(ctx context.Context) (Timeline, error) {
