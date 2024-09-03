@@ -12,6 +12,12 @@ import (
 	"github.com/cherryramatisdev/bskytui/util"
 )
 
+const (
+	maxPostLength = 140
+	listView      = iota
+	detailView
+)
+
 type Author struct {
 	DisplayName string
 	Handle      string
@@ -42,11 +48,10 @@ func (p Post) InteractionsString() string {
 }
 
 func (p Post) Description() string {
-	if p.Content != "" {
-		return fmt.Sprintf("%s...", p.Content[:len(p.Content)/2])
-	} else {
-		return ""
+	if len(p.Content) >= maxPostLength {
+		return fmt.Sprintf("%s...", p.Content[:maxPostLength])
 	}
+	return p.Content
 }
 
 func (p Post) FilterValue() string {
@@ -54,11 +59,6 @@ func (p Post) FilterValue() string {
 }
 
 type view int
-
-const (
-	listView = iota
-	detailView
-)
 
 type model struct {
 	view         view
