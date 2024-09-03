@@ -102,10 +102,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			if m.view == detailView {
 				m.view = listView
-				return m, nil
-			} else {
-				return m, tea.Quit
 			}
+
+			if m.view == listView && m.posts.IsFiltered() {
+				m.posts.ResetFilter()
+			}
+
+			return m, nil
 		case "ctrl-c", "q":
 			return m, tea.Quit
 		}
