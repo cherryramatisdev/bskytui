@@ -1,20 +1,40 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/cherryramatisdev/bskytui/sdk"
 	"github.com/cherryramatisdev/bskytui/tui"
 	"github.com/cherryramatisdev/bskytui/util"
+	"golang.org/x/term"
 )
 
 func main() {
+
+	fmt.Println("Username (example.bsky.social):")
+	fmt.Print("> @")
+
+	var user string
+	fmt.Scanln(&user)
+	if strings.HasPrefix(user, "@") {
+		user = user[1:]
+	}
+
+	fmt.Println("Password:")
+	fmt.Print("> ")
+	bPass, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		panic(err)
+	}
+
+	pass := string(bPass)
+
 	ctx, err := sdk.Authenticate(sdk.AuthUser{
-		// TODO: Implement proper text inputs on the TUI to handle user and
-		// password
-		Identifier: os.Getenv("BSKY_USER"),
-		Password:   os.Getenv("BSKY_PASSWORD"),
+		Identifier: user,
+		Password:   pass,
 	})
 
 	// TODO: remove this panic for a prettier handle (when it's TUI)

@@ -97,6 +97,10 @@ type Feed struct {
 			Langs []string    `json:"langs"`
 			Text  string      `json:"text"`
 		} `json:"record"`
+		ReplyCount  int `json:"replyCount"`
+		RepostCount int `json:"repostCount"`
+		LikeCount   int `json:"likeCount"`
+		QuoteCount  int `json:"quoteCount"`
 	} `json:"post"`
 }
 

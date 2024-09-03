@@ -9,6 +9,13 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/x/term"
 	"github.com/cherryramatisdev/bskytui/sdk"
+	"github.com/cherryramatisdev/bskytui/util"
+)
+
+const (
+	maxPostLength = 140
+	listView      = iota
+	detailView
 )
 
 type Author struct {
@@ -16,24 +23,35 @@ type Author struct {
 	Handle      string
 }
 
+type Interactions struct {
+	ReplyCount  int
+	RepostCount int
+	LikeCount   int
+	QuoteCount  int
+}
+
 type Post struct {
-	ID      string
-	Content string
-	Summary string
-	Author  Author
-	Langs   []string
+	ID           string
+	Content      string
+	Summary      string
+	Author       Author
+	Langs        []string
+	Interactions Interactions
 }
 
 func (p Post) Title() string {
-	return fmt.Sprintf("%s-%s", p.Author.DisplayName, p.Author.Handle)
+	return fmt.Sprintf("%s (@%s) - (%s)", p.Author.DisplayName, p.Author.Handle, p.InteractionsString())
+}
+
+func (p Post) InteractionsString() string {
+	return fmt.Sprintf("%v %s %v %s %v %s", p.Interactions.LikeCount, util.GetCountLabel(p.Interactions.LikeCount, "like"), p.Interactions.RepostCount+p.Interactions.QuoteCount, util.GetCountLabel(p.Interactions.RepostCount+p.Interactions.QuoteCount, "repost"), p.Interactions.ReplyCount, util.GetCountLabel(p.Interactions.ReplyCount, "reply"))
 }
 
 func (p Post) Description() string {
-	if p.Content != "" {
-		return fmt.Sprintf("%s...", p.Content[:len(p.Content)/2])
-	} else {
-		return ""
+	if len(p.Content) >= maxPostLength {
+		return fmt.Sprintf("%s...", p.Content[:maxPostLength])
 	}
+	return p.Content
 }
 
 func (p Post) FilterValue() string {
@@ -41,11 +59,6 @@ func (p Post) FilterValue() string {
 }
 
 type view int
-
-const (
-	listView = iota
-	detailView
-)
 
 type model struct {
 	view         view
@@ -61,16 +74,22 @@ func InitialModel(timeline sdk.Timeline) model {
 	items := make([]list.Item, len(feed))
 	width, height, _ := term.GetSize(0)
 
-	for i, post := range feed {
+	for i, c := range feed {
 		items[i] = Post{
 			ID:      "id",
-			Content: post.Post.Record.Text,
+			Content: c.Post.Record.Text,
 			Summary: "",
 			Author: Author{
-				DisplayName: post.Post.Author.DisplayName,
-				Handle:      post.Post.Author.Handle,
+				DisplayName: c.Post.Author.DisplayName,
+				Handle:      c.Post.Author.Handle,
 			},
-			Langs: post.Post.Record.Langs,
+			Interactions: Interactions{
+				ReplyCount:  c.Post.ReplyCount,
+				RepostCount: c.Post.RepostCount,
+				LikeCount:   c.Post.LikeCount,
+				QuoteCount:  c.Post.QuoteCount,
+			},
+			Langs: c.Post.Record.Langs,
 		}
 	}
 
