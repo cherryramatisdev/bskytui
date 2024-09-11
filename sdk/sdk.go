@@ -2,15 +2,16 @@ package sdk
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/keybase/go-keychain"
 )
 
-func newRequest(ctx context.Context, method string, action string, body io.Reader) (*http.Request, error) {
+func newRequest(token, method, action string, body io.Reader) (*http.Request, error) {
 	url := fmt.Sprintf("%s/%s", API_URL, action)
 	req, err := http.NewRequest(method, url, body)
 
@@ -20,9 +21,9 @@ func newRequest(ctx context.Context, method string, action string, body io.Reade
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
-	token := ctx.Value(CONTEXT_KEY_TOKEN)
-	if token != nil {
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.(string)))
+
+	if token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
 
 	return req, nil
@@ -34,55 +35,106 @@ type AuthUser struct {
 }
 
 type AuthSession struct {
+	AuthUser
 	Active    bool   `json:"active"`
 	AccessJWT string `json:"accessJwt"`
 }
 
-func Authenticate(authUser AuthUser) (context.Context, error) {
+func SaveAuthInfo(authSession *AuthSession) error {
+	data, err := json.Marshal(authSession)
+
+	if err != nil {
+		return err
+	}
+
+	authItem := keychain.NewItem()
+	authItem.SetSecClass(keychain.SecClassGenericPassword)
+	authItem.SetService("bsky_tui")
+	authItem.SetAccount(authSession.Identifier)
+	authItem.SetAuthenticationType(keychain.AuthenticationTypeKey)
+	authItem.SetData(data)
+	authItem.SetAccessible(keychain.AccessibleWhenUnlocked)
+
+	keychain.DeleteItem(authItem)
+	keychain.AddItem(authItem)
+
+	return nil
+}
+
+func LoadAuthInfo() (AuthSession, error) {
+	queryItem := keychain.NewItem()
+	queryItem.SetSecClass(keychain.SecClassGenericPassword)
+	queryItem.SetService("bsky_tui")
+	queryItem.SetMatchLimit(keychain.MatchLimitOne)
+	queryItem.SetReturnAttributes(true)
+	queryItem.SetReturnData(true)
+
+	results, err := keychain.QueryItem(queryItem)
+	if err != nil || len(results) == 0 {
+		return AuthSession{}, err
+	}
+
+	var auth AuthSession
+	if err := json.Unmarshal(results[0].Data, &auth); err != nil {
+		return AuthSession{}, err
+	}
+
+	return auth, nil
+}
+
+func Authenticate(username, password string) error {
 	client := &http.Client{}
 
 	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(authUser)
+	err := json.NewEncoder(&buf).Encode(&AuthUser{
+		Identifier: username,
+		Password:   password,
+	})
+
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req, err := newRequest(context.Background(), "POST", "com.atproto.server.createSession", &buf)
+	req, err := newRequest("", "POST", "com.atproto.server.createSession", &buf)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.New("Invalid identifier or password")
+		return errors.New("Invalid identifier or password")
 	}
 
 	var authSession AuthSession
 	err = json.Unmarshal(body, &authSession)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !authSession.Active {
-		return nil, errors.New("User not active")
+		return errors.New("User not active")
 	}
 
-	ctx := context.WithValue(context.Background(), CONTEXT_KEY_TOKEN, authSession.AccessJWT)
+	err = SaveAuthInfo(&authSession)
 
-	return ctx, nil
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type Feed struct {
@@ -104,10 +156,10 @@ type Timeline struct {
 	Feed []Feed `json:"feed"`
 }
 
-func GetTimeline(ctx context.Context) (Timeline, error) {
+func GetTimeline(session *AuthSession) (Timeline, error) {
 	client := &http.Client{}
 
-	req, err := newRequest(ctx, "GET", "app.bsky.feed.getTimeline", nil)
+	req, err := newRequest(session.AccessJWT, "GET", "app.bsky.feed.getTimeline", nil)
 	if err != nil {
 		return Timeline{}, err
 	}
